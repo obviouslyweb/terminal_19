@@ -6,13 +6,13 @@ from discord import app_commands
 class AudioCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        print("AudioCog loaded.")
+        print("Cog 'audio' loaded.")
 
     @commands.command()
     async def play(self, ctx, filename: str):
         print(f"[DEBUG] Play command received with filename: {filename!r}")
         if not os.path.exists(filename):
-            await ctx.send(f"`[T_19] COULD NOT PLAY AUDIO: THE FILE'{filename}' DOES NOT CURRENTLY EXIST IN THE TERMINAL.`")
+            await ctx.send(f"`[T_19] COULD NOT PLAY AUDIO: THE FILE '{filename}' DOES NOT CURRENTLY EXIST IN THE TERMINAL.`")
             return
 
         if not ctx.voice_client:

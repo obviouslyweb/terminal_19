@@ -4,7 +4,7 @@ from discord.ext import commands
 class CommandsCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        print("Cog commands loaded.")
+        print("Cog 'commands' loaded.")
 
     @commands.command(name="info")
     async def info(self, ctx):
