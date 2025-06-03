@@ -14,7 +14,7 @@ class EventsCog(commands.Cog):
         if "test_swear" in message.content.lower():
             try:
                 await message.delete()
-                await message.channel.send(f"{message.author.mention} `[T_18] PLEASE FOLLOW PROPER SYSTEM REGULATIONS FOR LANGUAGE.`")
+                await message.channel.send(f"{message.author.mention} `[T_19] PLEASE FOLLOW PROPER SYSTEM REGULATIONS FOR LANGUAGE.`")
             except discord.Forbidden:
                 print("ERROR: Bot lacks permissions to delete messages.")
             except discord.HTTPException as e:

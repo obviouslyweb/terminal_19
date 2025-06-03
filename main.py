@@ -21,9 +21,10 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 
 # Load cogs
 @bot.event
-async def on_ready(): # Notify terminal when bot is ready
+async def on_ready():
     print(f'We have logged in as {bot.user}') 
     await bot.load_extension("cogs.commands")
     await bot.load_extension("cogs.events")
+    await bot.load_extension("cogs.audio")
 
 bot.run(token, log_handler=handler, log_level=logging.DEBUG)
