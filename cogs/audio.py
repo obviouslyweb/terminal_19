@@ -73,8 +73,7 @@ class AudioCog(commands.Cog):
         self.play_next(ctx, guild_id)
 
     @commands.command()
-    async def play(self, ctx, filename: str):
-        """Play selected audio from the sounds list. Must follow the usage '!play <filename.ext>'."""
+    async def play(self, ctx, filename: str):        
         guild_id = ctx.guild.id
         print(f"[DEBUG] Play command received with filename: {filename!r}")
         file_path = self.resolve_audio_path(filename)
