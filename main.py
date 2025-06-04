@@ -28,3 +28,7 @@ async def on_ready():
     await bot.load_extension("cogs.audio")
 
 bot.run(token, log_handler=handler, log_level=logging.DEBUG)
+
+# TO-DO:
+    # + Further format and add details for !help
+    # + Update bot description & documentation

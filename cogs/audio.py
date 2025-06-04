@@ -7,12 +7,20 @@ class AudioCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.audio_queues = {}
+        self.looping = {}
+        self.current_track = {}
+        self.skip_requested = {}
+        self.queue_cache = {}
         self.audio_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "audio")
         print("Cog 'audio' loaded.")
 
     def get_queue(self, guild_id):
         if guild_id not in self.audio_queues:
             self.audio_queues[guild_id] = asyncio.Queue()
+            self.skip_requested[guild_id] = False
+            self.queue_cache[guild_id] = []
+        if guild_id not in self.looping:
+            self.looping[guild_id] = False
         return self.audio_queues[guild_id]
 
     def resolve_audio_path(self, filename):
@@ -25,18 +33,33 @@ class AudioCog(commands.Cog):
             if queue.empty():
                 return
             filename = await queue.get()
+            self.queue_cache[guild_id].pop(0)
             file_path = self.resolve_audio_path(filename)
             if not os.path.exists(file_path):
                 await ctx.send(f"`[T_19] FILE '{filename}' NOT FOUND.`")
                 self.play_next(ctx, guild_id)
                 return
 
+            self.current_track[ctx.guild.id] = self.resolve_audio_path(filename)
             print(f"[DEBUG] Now playing: {filename}")
+            await ctx.send(f"`[T_19] NOW PLAYING '{filename}'.`")
             source = discord.FFmpegPCMAudio(file_path, executable="ffmpeg")
 
             def after_playing(error):
                 if error:
                     print(f"[ERROR] Playback error: {error}")
+                if self.skip_requested.get(guild_id):
+                    print(f"[DEBUG] Skip was requested; ignoring current loop.")
+                    self.skip_requested[guild_id] = False
+                    fut = asyncio.run_coroutine_threadsafe(
+                        self._safe_play_next(ctx, guild_id), self.bot.loop
+                    )
+                    return
+                if self.looping.get(guild_id):
+                    print(f"[DEBUG] Looping track: {self.current_track[guild_id]}")
+                    new_source = discord.FFmpegPCMAudio(self.current_track[guild_id], executable="ffmpeg")
+                    ctx.voice_client.play(new_source, after=after_playing)
+                    return
                 fut = asyncio.run_coroutine_threadsafe(
                     self._safe_play_next(ctx, guild_id), self.bot.loop
                 )
@@ -51,6 +74,8 @@ class AudioCog(commands.Cog):
 
     @commands.command()
     async def play(self, ctx, filename: str):
+        """Play selected audio from the sounds list. Must follow the usage '!play <filename.ext>'."""
+        guild_id = ctx.guild.id
         print(f"[DEBUG] Play command received with filename: {filename!r}")
         file_path = self.resolve_audio_path(filename)
         if not os.path.exists(file_path):
@@ -63,6 +88,7 @@ class AudioCog(commands.Cog):
 
         queue = self.get_queue(ctx.guild.id)
         await queue.put(filename)
+        self.queue_cache[guild_id].append(filename)
         await ctx.send(f"`[T_19] QUEUED: '{filename}'.`")
 
         if not ctx.voice_client.is_playing():
@@ -70,11 +96,13 @@ class AudioCog(commands.Cog):
 
     @commands.command()
     async def skip(self, ctx):
+        """Skip the currently playing track."""
         if not ctx.voice_client:
             await ctx.send("`[T_19] NOT IN A VOICE CHANNEL.`")
             return
 
         if ctx.voice_client.is_playing():
+            self.skip_requested[ctx.guild.id] = True
             ctx.voice_client.stop()
             await ctx.send("`[T_19] SKIPPED TO NEXT TRACK.`")
         else:
@@ -82,9 +110,13 @@ class AudioCog(commands.Cog):
 
     @commands.command()
     async def stop(self, ctx):
+        """Stop playing current audio and clear the queue."""
+        guild_id = ctx.guild.id
         if ctx.voice_client:
             ctx.voice_client.stop()
             queue = self.get_queue(ctx.guild.id)
+            self.queue_cache[guild_id].clear()
+            self.looping[ctx.guild.id] = False
             while not queue.empty():
                 queue.get_nowait()
             await ctx.send("`[T_19] AUDIO STOPPED AND QUEUE CLEARED.`")
@@ -92,7 +124,18 @@ class AudioCog(commands.Cog):
             await ctx.send("`[T_19] NOT IN A VOICE CHANNEL.`")
 
     @commands.command()
+    async def loop(self, ctx):
+        """Disable or enable track looping."""
+        if self.looping.get(ctx.guild.id, False):
+            self.looping[ctx.guild.id] = False
+            await ctx.send("`[T_19] LOOPING HAS BEEN DISABLED.`")
+        else:
+            self.looping[ctx.guild.id] = True
+            await ctx.send("`[T_19] LOOPING HAS BEEN ENABLED.`")
+
+    @commands.command()
     async def pause(self, ctx):
+        """Pause the currently playing track."""
         if ctx.voice_client and ctx.voice_client.is_playing():
             ctx.voice_client.pause()
             await ctx.send("`[T_19] AUDIO PAUSED.`")
@@ -101,11 +144,103 @@ class AudioCog(commands.Cog):
 
     @commands.command()
     async def unpause(self, ctx):
+        """Resume playing the currently paused track."""
         if ctx.voice_client and ctx.voice_client.is_paused():
             ctx.voice_client.resume()
             await ctx.send("`[T_19] AUDIO RESUMED.`")
         else:
             await ctx.send("`[T_19] AUDIO IS NOT PAUSED.`")
 
+    @commands.command()
+    async def queue(self, ctx):
+        """View the current queue, as well as currently playing music and the loop status."""
+        guild_id = ctx.guild.id
+        current = self.current_track.get(guild_id)
+        queue = self.queue_cache.get(guild_id, [])
+
+        if not current and not queue:
+            await ctx.send("`[T_19] QUEUE IS CURRENTLY EMPTY.`")
+            return
+        
+        message = "`[T_19] CURRENT QUEUE:`\n"
+
+        if current:
+            current_filename = os.path.basename(current)
+            message += f"`NOW PLAYING --> {current_filename}`\n\n"
+        
+        if queue:
+            message += "`PLAYING NEXT:\n`"
+            for i, track in enumerate(queue, start=1):
+                message += f"`{i}. {track}`\n"
+        
+        if self.looping.get(guild_id):
+            message += "`LOOPING = ON`"
+        else:
+            message += "`LOOPING = OFF`"
+        
+        await ctx.send(message)
+
+    @commands.command()
+    async def sounds(self, ctx):
+        """Displays all currently available tracks the bot can play."""
+        try:
+            files = os.listdir(self.audio_folder)
+            audio_files = [f for f in files if f.lower().endswith(('.mp3', '.wav', '.ogg', '.flac', '.m4a'))]
+
+            if not audio_files:
+                await ctx.send("`[T_19] NO AUDIO FILES FOUND IN THE AUDIO FOLDER.`")
+                return
+
+            page_size = 10
+            pages = [audio_files[i:i+page_size] for i in range(0, len(audio_files), page_size)]
+            total_pages = len(pages)
+            current_page = 0
+
+            def get_page_content(page):
+                content = f"`[T_19] AVAILABLE AUDIO (PAGE {page+1}/{total_pages}):`\n"
+                for i, filename in enumerate(pages[page], start=1 + page * page_size):
+                    content += f"`{i}. {filename}`\n"
+                content += "`TO PLAY AUDIO, TYPE '!play (filename with extension)'.`\n"
+                if total_pages > 1:
+                    content += "`TO VIEW OTHER AUDIO FILES IN THE FOLDER, USE ARROW REACTIONS.`"
+                return content
+
+
+            message = await ctx.send(get_page_content(current_page))
+
+            if total_pages == 1:
+                return
+                
+            await message.add_reaction("⬅️")
+            await message.add_reaction("➡️")
+
+            def check(reaction, user):
+                return (
+                    user == ctx.author and reaction.message.id == message.id and str(reaction.emoji) in ["⬅️", "➡️"]
+                )
+                
+            while True:
+                try:
+                    reaction, user = await self.bot.wait_for('reaction_add', timeout=60.0, check=check)
+
+                    if str(reaction.emoji) == "➡️":
+                        if current_page < total_pages - 1:
+                            current_page += 1
+                            await message.edit(content=get_page_content(current_page))
+                    elif str(reaction.emoji) == "⬅️":
+                        if current_page > 0:
+                            current_page -= 1
+                            await message.edit(content=get_page_content(current_page))
+                        
+                    await message.remove_reaction(reaction, user)
+                    
+                except asyncio.TimeoutError:
+                    await message.clear_reactions()
+                    break
+
+        except Exception as e:
+            await ctx.send(f"`[T_19] ERROR READING AUDIO FOLDER.`")
+            print(f"[ERROR] Error reading audio folder in sounds command: {e}")
+                
 async def setup(bot):
     await bot.add_cog(AudioCog(bot))
