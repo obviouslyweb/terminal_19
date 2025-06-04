@@ -1,5 +1,4 @@
 .env
 __pycache__
 discord.log
-duck.wav
-spaceship.wav
+/audio
