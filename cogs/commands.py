@@ -9,12 +9,12 @@ class CommandsCog(commands.Cog):
 
     @commands.command(name="info", help="Display bot version and details.")
     async def info(self, ctx):
-        await ctx.send("`CURRENTLY RUNNING T_19 VER 0.2.0.`")
+        await ctx.send("`CURRENTLY RUNNING TERMINAL_19 BOT VERSION 1.0.0.`")
 
     @commands.command()
     async def help(self, ctx):
         await ctx.send("```"
-            "TERMINAL_19 COMMANDS\n"
+            "TERMINAL_19 COMMANDS\n\n"
             "[ CORE COMMANDS ]\n"
             "!help - Display all commands\n"
             "!info - Display bot version\n"
@@ -31,8 +31,6 @@ class CommandsCog(commands.Cog):
             "!clearqueue - Clear all tracks in the queue.\n"
             "!pause - Pauses the currently playing track.\n"
             "!unpause - Resume playing a paused track.\n"
-            "\n"
-            "Created & maintained by @thewebcon\n"
             "```"
         )
 
