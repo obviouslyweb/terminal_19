@@ -8,7 +8,8 @@
 
 ## Instructions for Build and Use
 
-**IMPORTANT:** TERMINAL_19 is meant to be a private audio bot that you can load tracks into and play audio with in smaller, friends-focused Discord servers. Therefore, these steps encompass the process of creating your own version of the bot from scratch. **You must host the bot yourself.** There is no invite link to a version of the bot that is publicly hosted, as I don't want to be liable for whatever you do with this bot. Proceeding to use the code I've provided here for this application means that you agree to follow Discord's Terms of Service and that I am NOT LIABLE for anything that happens as a result of this application.
+⚠️ **IMPORTANT - READ BEFORE USE** ⚠️
+TERMINAL_19 is meant to be a private audio bot that you can load tracks into and play audio with in smaller, friends-focused Discord servers. Therefore, these steps encompass the process of creating your own version of the bot from scratch. **You must host the bot yourself.** There is no invite link to a version of the bot that is publicly hosted, as I don't want to be liable for whatever you do with this bot. Proceeding to use the code I've provided here for this application means that you agree to follow Discord's Terms of Service and that I am NOT LIABLE for anything that happens as a result of this application.
 
 To create your own bot using TERMINAL_19 as a base, follow the given instructions:
 
@@ -17,7 +18,7 @@ To create your own bot using TERMINAL_19 as a base, follow the given instruction
 3. Download the contents of this repository to your computer and store in a safe location (optimally somewhere easy to access).
 4. Log into the [Discord Developer Portal](https://discord.com/developers/applications) using your Discord account. Create a new application and give it a name. On the *Bot* page, toggle "Server Members Intent" and "Message Content Intent"; these are required for the bot to be able to properly process user information and messages to read messages.
 5. In the main `terminal_19` folder, create a new file called `.env`. This will contain important details that our bot needs to run. Type `DISCORD_TOKEN=` in the first and only line in the file. Back in the Discord Developer Portal *Bot* page, there should be a button named "Reset Token"; click it and obtain your bot's token, and paste it back in the `.env` file after `DISCORD_TOKEN=`. Then, save the file.
-**WARNING: DO NOT SHARE YOUR BOT TOKEN WITH ANYONE!**  If it's stolen, others can log in as this bot with custom functionality NOT in your code.
+**⚠️ WARNING: DO NOT SHARE YOUR BOT TOKEN WITH ANYONE!**  If it's stolen, others can log in as this bot with custom functionality NOT in your code.
 6. Return to your application on the Discord Developer Portal and go to the OAuth2 tab. Scroll down to *OAuth2 URL Generator*. This is where you'll create the invite link that you will use to invite the bot into your server. Toggle "bot", "applications.commands", and then under Bot Permissions, "View Channels", "Send Messages", "Send Messages in Threads", "Manage Messages", "Read Message History", "Add Reactions", "Connect", "Speak", and "Use Voice Activity". Then, under Integration Type, choose "Guild Install". Copy the Generated URL and store it so you can use it to reinvite the bot going forward.
 7. Open the link with your Discord account, and select the server(s) you want to add it to. Once added, it will appear offline; this is because we've yet to turn the bot on.
 
