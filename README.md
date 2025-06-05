@@ -8,8 +8,7 @@
 
 ## Instructions for Build and Use
 
-⚠️ **IMPORTANT - READ BEFORE USE** ⚠️
-TERMINAL_19 is meant to be a private audio bot that you can load tracks into and play audio with in smaller, friends-focused Discord servers. Therefore, these steps encompass the process of creating your own version of the bot from scratch. **You must host the bot yourself.** There is no invite link to a version of the bot that is publicly hosted, as I don't want to be liable for whatever you do with this bot. Proceeding to use the code I've provided here for this application means that you agree to follow Discord's Terms of Service and that I am NOT LIABLE for anything that happens as a result of this application.
+⚠️ **IMPORTANT - READ BEFORE USE**: TERMINAL_19 is meant to be a private audio bot that you can load tracks into and play audio with in smaller, friends-focused Discord servers. Therefore, these steps encompass the process of creating your own version of the bot from scratch. **You must host the bot yourself.** There is no invite link to a version of the bot that is publicly hosted, as I don't want to be liable for whatever you do with this bot. Proceeding to use the code I've provided here for this application means that you agree to follow Discord's Terms of Service and that I am NOT LIABLE for anything that happens as a result of this application.
 
 To create your own bot using TERMINAL_19 as a base, follow the given instructions:
 
