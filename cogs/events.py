@@ -11,16 +11,10 @@ class EventsCog(commands.Cog):
         if message.author == self.bot.user:
             return
 
-        if "test_swear" in message.content.lower():
-            try:
-                await message.delete()
-                await message.channel.send(f"{message.author.mention} `PLEASE FOLLOW PROPER SYSTEM REGULATIONS FOR LANGUAGE.`")
-            except discord.Forbidden:
-                print("ERROR: Bot lacks permissions to delete messages.")
-            except discord.HTTPException as e:
-                print(f"ERROR: Failed to delete message: {e}")
-        
-        print(f"[DEBUG] Processing message: {message.content}")
+        if message.content.strip().lower().startswith("!play"):
+            parts = message.content.strip().split(maxsplit=1)
+            if len(parts) == 1 or not parts[1].strip():
+                await message.channel.send(f"{message.author.mention} `PLEASE SPECIFY A FILENAME (!play <filename.ext>). USE !sounds TO VIEW AVAILABLE TRACKS.`")
 
 async def setup(bot):
     await bot.add_cog(EventsCog(bot))

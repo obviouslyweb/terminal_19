@@ -13,6 +13,7 @@ class AudioCog(commands.Cog):
         self.queue_cache = {}
         self.audio_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "audio")
         print("Cog 'audio' loaded.")
+        self.__cog_name__ = "Audio"
 
     def get_queue(self, guild_id):
         if guild_id not in self.audio_queues:
