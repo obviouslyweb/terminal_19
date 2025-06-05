@@ -36,13 +36,13 @@ class AudioCog(commands.Cog):
             self.queue_cache[guild_id].pop(0)
             file_path = self.resolve_audio_path(filename)
             if not os.path.exists(file_path):
-                await ctx.send(f"`[T_19] FILE '{filename}' NOT FOUND.`")
+                await ctx.send(f"`FILE '{filename}' NOT FOUND.`")
                 self.play_next(ctx, guild_id)
                 return
 
             self.current_track[ctx.guild.id] = self.resolve_audio_path(filename)
             print(f"[DEBUG] Now playing: {filename}")
-            await ctx.send(f"`[T_19] NOW PLAYING '{filename}'.`")
+            await ctx.send(f"`NOW PLAYING '{filename}'.`")
             source = discord.FFmpegPCMAudio(file_path, executable="ffmpeg")
 
             def after_playing(error):
@@ -73,39 +73,55 @@ class AudioCog(commands.Cog):
         self.play_next(ctx, guild_id)
 
     @commands.command()
-    async def play(self, ctx, filename: str):        
+    async def play(self, ctx, filename: str):
+        """Queue up audio from the audio folder if it's a valid audio file."""
         guild_id = ctx.guild.id
         print(f"[DEBUG] Play command received with filename: {filename!r}")
         file_path = self.resolve_audio_path(filename)
+
+        valid_extensions = ('.mp3', '.wav', '.ogg', '.flac', '.m4a')
+        if not filename.lower().endswith(valid_extensions):
+            await ctx.send(f"`'{filename}' IS NOT A SUPPORTED AUDIO FILE.`")
+            return
+
         if not os.path.exists(file_path):
-            await ctx.send(f"`[T_19] FILE '{filename}' DOES NOT EXIST.`")
+            await ctx.send(f"`FILE '{filename}' DOES NOT EXIST.`")
             return
 
         if not ctx.voice_client:
             await ctx.send("`[T_18] TERMINAL MUST BE IN A VOICE CHANNEL TO PLAY AUDIO.`")
             return
 
-        queue = self.get_queue(ctx.guild.id)
+        queue = self.get_queue(guild_id)
         await queue.put(filename)
         self.queue_cache[guild_id].append(filename)
-        await ctx.send(f"`[T_19] QUEUED: '{filename}'.`")
+        await ctx.send(f"`QUEUED: '{filename}'.`")
 
         if not ctx.voice_client.is_playing():
-            self.play_next(ctx, ctx.guild.id)
+            self.play_next(ctx, guild_id)
 
     @commands.command()
     async def skip(self, ctx):
         """Skip the currently playing track."""
+        guild_id = ctx.guild.id
         if not ctx.voice_client:
-            await ctx.send("`[T_19] NOT IN A VOICE CHANNEL.`")
+            await ctx.send("`NOT IN A VOICE CHANNEL.`")
             return
 
         if ctx.voice_client.is_playing():
-            self.skip_requested[ctx.guild.id] = True
+            self.skip_requested[guild_id] = True
             ctx.voice_client.stop()
-            await ctx.send("`[T_19] SKIPPED TO NEXT TRACK.`")
+
+            await asyncio.sleep(1)
+
+            queue = self.get_queue(guild_id)
+            if queue.empty():
+                await ctx.send("`REACHED END OF QUEUE. USE !play (file) TO CONTINUE PLAYBACK.`")
+            else:
+                await ctx.send("`SKIPPED TO NEXT TRACK.`")
         else:
-            await ctx.send("`[T_19] NO AUDIO TO SKIP.`")
+            await ctx.send("`NO AUDIO TO SKIP.`")
+
 
     @commands.command()
     async def stop(self, ctx):
@@ -118,37 +134,53 @@ class AudioCog(commands.Cog):
             self.looping[ctx.guild.id] = False
             while not queue.empty():
                 queue.get_nowait()
-            await ctx.send("`[T_19] AUDIO STOPPED AND QUEUE CLEARED.`")
+            await ctx.send("`AUDIO STOPPED AND QUEUE CLEARED.`")
         else:
-            await ctx.send("`[T_19] NOT IN A VOICE CHANNEL.`")
+            await ctx.send("`NOT IN A VOICE CHANNEL.`")
+    
+    @commands.command()
+    async def clearqueue(self, ctx):
+        """Clear the rest of the song queue."""
+        guild_id = ctx.guild.id
+        if ctx.voice_client:
+            queue = self.get_queue(ctx.guild.id)
+            self.queue_cache[guild_id].clear()
+            if not queue.empty():
+                while not queue.empty():
+                    queue.get_nowait()
+                await ctx.send("`QUEUE CLEARED.`")
+            else:
+                await ctx.send("`THERE ARE NO QUEUED SONGS TO CLEAR.`")
+        else:
+            await ctx.send("`NOT IN A VOICE CHANNEL.`")
 
     @commands.command()
     async def loop(self, ctx):
         """Disable or enable track looping."""
         if self.looping.get(ctx.guild.id, False):
             self.looping[ctx.guild.id] = False
-            await ctx.send("`[T_19] LOOPING HAS BEEN DISABLED.`")
+            await ctx.send("`LOOPING HAS BEEN DISABLED.`")
         else:
             self.looping[ctx.guild.id] = True
-            await ctx.send("`[T_19] LOOPING HAS BEEN ENABLED.`")
+            await ctx.send("`LOOPING HAS BEEN ENABLED.`")
 
     @commands.command()
     async def pause(self, ctx):
         """Pause the currently playing track."""
         if ctx.voice_client and ctx.voice_client.is_playing():
             ctx.voice_client.pause()
-            await ctx.send("`[T_19] AUDIO PAUSED.`")
+            await ctx.send("`AUDIO PAUSED.`")
         else:
-            await ctx.send("`[T_19] NO AUDIO TO PAUSE.`")
+            await ctx.send("`NO AUDIO TO PAUSE.`")
 
     @commands.command()
     async def unpause(self, ctx):
         """Resume playing the currently paused track."""
         if ctx.voice_client and ctx.voice_client.is_paused():
             ctx.voice_client.resume()
-            await ctx.send("`[T_19] AUDIO RESUMED.`")
+            await ctx.send("`AUDIO RESUMED.`")
         else:
-            await ctx.send("`[T_19] AUDIO IS NOT PAUSED.`")
+            await ctx.send("`AUDIO IS NOT PAUSED.`")
 
     @commands.command()
     async def queue(self, ctx):
@@ -158,17 +190,17 @@ class AudioCog(commands.Cog):
         queue = self.queue_cache.get(guild_id, [])
 
         if not current and not queue:
-            await ctx.send("`[T_19] QUEUE IS CURRENTLY EMPTY.`")
+            await ctx.send("`QUEUE IS CURRENTLY EMPTY.`")
             return
         
-        message = "`[T_19] CURRENT QUEUE:`\n"
+        message = ""
 
         if current:
             current_filename = os.path.basename(current)
             message += f"`NOW PLAYING --> {current_filename}`\n\n"
         
         if queue:
-            message += "`PLAYING NEXT:\n`"
+            message += "`PLAYING NEXT:`\n"
             for i, track in enumerate(queue, start=1):
                 message += f"`{i}. {track}`\n"
         
@@ -187,7 +219,7 @@ class AudioCog(commands.Cog):
             audio_files = [f for f in files if f.lower().endswith(('.mp3', '.wav', '.ogg', '.flac', '.m4a'))]
 
             if not audio_files:
-                await ctx.send("`[T_19] NO AUDIO FILES FOUND IN THE AUDIO FOLDER.`")
+                await ctx.send("`NO AUDIO FILES FOUND IN THE AUDIO FOLDER.`")
                 return
 
             page_size = 10
@@ -196,7 +228,7 @@ class AudioCog(commands.Cog):
             current_page = 0
 
             def get_page_content(page):
-                content = f"`[T_19] AVAILABLE AUDIO (PAGE {page+1}/{total_pages}):`\n"
+                content = f"`AVAILABLE AUDIO (PAGE {page+1}/{total_pages}):`\n"
                 for i, filename in enumerate(pages[page], start=1 + page * page_size):
                     content += f"`{i}. {filename}`\n"
                 content += "`TO PLAY AUDIO, TYPE '!play (filename with extension)'.`\n"
@@ -238,7 +270,7 @@ class AudioCog(commands.Cog):
                     break
 
         except Exception as e:
-            await ctx.send(f"`[T_19] ERROR READING AUDIO FOLDER.`")
+            await ctx.send(f"`ERROR READING AUDIO FOLDER.`")
             print(f"[ERROR] Error reading audio folder in sounds command: {e}")
                 
 async def setup(bot):
