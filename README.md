@@ -2,13 +2,13 @@
 
 **Project Title**: TERMINAL_19
 
-**Project Description**: A music bot created using Discord.py that allows users to upload their own audio tracks to listen to in voice channels, with support for a variety of audio filetypes, playlist features, looping tracks, and (theoretically) support for an infinite amount of tracks to be played.
+**Project Description**: A music bot created using Discord.py that allows users to upload their own audio tracks to listen to them in voice channels, with support for a variety of audio filetypes, playlist features, looping tracks, and (theoretically) support for an infinite amount of tracks to be played.
 
 **Project Goals**: To understand how a pre-existing platform API (like Discord) functions and create a custom application that can interface with it to provide extended and customized functionality, as well as understand community-created libraries (Discord.py & ffmpeg) to achieve said functionality.
 
 ## Instructions for Build and Use
 
-⚠️ **IMPORTANT - READ BEFORE USE**: TERMINAL_19 is meant to be a private audio bot that you can load tracks into and play audio with in smaller, friends-focused Discord servers. Therefore, these steps encompass the process of creating your own version of the bot from scratch. **You must host the bot yourself.** There is no invite link to a version of the bot that is publicly hosted, as I don't want to be liable for whatever you do with this bot. Proceeding to use the code I've provided here for this application means that you agree to follow Discord's Terms of Service and that I am NOT LIABLE for anything that happens as a result of this application.
+⚠️ **IMPORTANT - READ BEFORE USE**: TERMINAL_19 is meant to be a private audio bot that you can load tracks into and play audio with in private invite-only Discord servers. Therefore, these steps encompass the process of creating your own version of the bot from scratch. **You must host the bot yourself.** There is no invite link to a version of the bot that is publicly hosted, as I don't want to be liable for whatever you do with this bot. Proceeding to use the code I've provided here for this application means that you agree to follow Discord's Terms of Service and that I am NOT LIABLE for anything that happens as a result of this application.
 
 To create your own bot using TERMINAL_19 as a base, follow the given instructions:
 
@@ -30,7 +30,8 @@ Instructions for turning on / disabling the bot:
 
 Instructions for adding audio to the bot:
 
-1. Find a compatible audio file ()
+1. Find a compatible audio file (mp3, wav, ogg, m4a, or flac) that you want to play. While not necessary, it's recommended to give it a short or easily memorable name, as users will have to repeat the filename in order to play the audio. **Make sure you're OK with the details in the filename, as these will be publically visible to users interfacing with the bot!**
+2. In the `audio` folder of the bot, place your files there. The bot will now be able to find and play audio from the folder. You can even add and remove tracks from there while the bot is still running, although
 
 ## Development Environment 
 
@@ -39,21 +40,21 @@ To recreate the development environment, you need the following software and/or 
 * [Visual Studio Code](https://code.visualstudio.com/)
 * [Python 3.11.5](https://www.python.org/downloads/)
 * [discord.py 2.3.2](https://discordpy.readthedocs.io/en/stable/)
-* [ffmpeg](https://ffmpeg.org/)
-* dotenv (`python-dotenv`)
+* [ffmpeg 7.7.1-full_build-www.gyan.dev](https://ffmpeg.org/)
 
 ## Useful Websites to Learn More
 
 I found these websites useful in developing this software:
 
 * [discord.py](https://discordpy.readthedocs.io/en/stable/)'s documentation on the Python libraries used to create this application
-* 
-* 
+* [Python Package Index - discord.py](https://pypi.org/project/discord.py/)
+* [Discord Developer Documentation](https://discord.com/developers/docs/intro)
 
 ## Future Work
 
 The following items I plan to fix, improve, and/or add to this project in the future:
 
+* [ ] Fix spaces in track names not working.
 * [ ] Additional playback features (show current timestamp of playing song in !queue, keep playlist mode, etc.)
 * [ ] Integrate functionality with Discord slash commands (the ability to use /play instead of !play).
 * [ ] Include integration with YouTube or Soundcloud APIs for streaming music from online sources

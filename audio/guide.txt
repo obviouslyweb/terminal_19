@@ -5,7 +5,7 @@ The bot will ignore any files that don't match the following extensions:
 - wav
 - ogg
 - m4a
-- .flac
+- flac
 
 WARNING!
 The bot WILL display the filenames of the files to end users.
