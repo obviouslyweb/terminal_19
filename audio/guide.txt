@@ -1,0 +1,12 @@
+Place any audio files that you want the bot to be able to play in this folder.
+
+The bot will ignore any files that don't match the following extensions:
+- mp3 
+- wav
+- ogg
+- m4a
+- .flac
+
+WARNING!
+The bot WILL display the filenames of the files to end users.
+Make sure you're OK with others seeing the filenames of the audio you put in here.
