@@ -18,20 +18,20 @@ To create your own bot using TERMINAL_19 as a base, follow the given instruction
 4. Log into the [Discord Developer Portal](https://discord.com/developers/applications) using your Discord account. Create a new application and give it a name. On the *Bot* page, toggle "Server Members Intent" and "Message Content Intent"; these are required for the bot to be able to properly process user information and messages to read messages.
 5. In the main `terminal_19` folder, create a new file called `.env`. This will contain important details that our bot needs to run. Type `DISCORD_TOKEN=` in the first and only line in the file. Back in the Discord Developer Portal *Bot* page, there should be a button named "Reset Token"; click it and obtain your bot's token, and paste it back in the `.env` file after `DISCORD_TOKEN=`. Then, save the file.
 **⚠️ WARNING: DO NOT SHARE YOUR BOT TOKEN WITH ANYONE!** If it's stolen, others can log in as this bot with custom functionality NOT in your code.
-6. Install the required dependencies specified in `requirements.txt`. You can do this easily by opening Command Prompt, Terminal, or equivalent program on your device, navigate to the`terminal_19` folder using `cd (path to terminal_19)`, and run `pip install -r requirements.txt`. This will find the requirements and install the necessary libraries that the bot needs to run properly.
+6. Install the required dependencies specified in `requirements.txt`. You can do this easily by opening Command Prompt, Terminal, or equivalent program on your device, navigate to the `terminal_19` folder using `cd path/to/terminal_19`, and run `pip install -r requirements.txt` to install all required Python libraries.
 7. Return to your application on the Discord Developer Portal and go to the OAuth2 tab. Scroll down to *OAuth2 URL Generator*. This is where you'll create the invite link that you will use to invite the bot into your server. Toggle "bot", "applications.commands", and then under Bot Permissions, "View Channels", "Send Messages", "Send Messages in Threads", "Manage Messages", "Read Message History", "Add Reactions", "Connect", "Speak", and "Use Voice Activity". Then, under Integration Type, choose "Guild Install". Copy the Generated URL and store it so you can use it to reinvite the bot going forward.
 8. Open the link with your Discord account, and select the server(s) you want to add it to. Once added, it will appear offline; this is because we've yet to turn the bot on.
 
 Instructions for turning on / disabling the bot:
 
-1. Using Command Prompt, Terminal, or an equivalent program, navigate to the `terminal_19` folder using `cd (path to terminal_19)`.
+1. Using Command Prompt, Terminal, or an equivalent program, navigate to the `terminal_19` folder using `cd path/to/terminal_19`.
 2. Type `python main.py` to turn the bot on. After a few seconds, the bot should load and display a message, "Logged in as (bot name)#1234 (ID: ####)". Once you see this message, the bot will start accepting commands.
 3. In Discord, use !help on any channel the bot is in to see the bot's available commands.
 4. To turn off the bot, use `CTRL + C` on the window you used to enable the bot. This will take it offline until you turn it back on.
 
 Instructions for adding audio to the bot:
 
-1. Find a compatible audio file (mp3, wav, ogg, m4a, or flac) that you want to play. While not necessary, it's recommended to give it a short or easily memorable name, as users will have to repeat the filename in order to play the audio. **Make sure you're OK with the details in the filename, as these will be publically visible to users interfacing with the bot!**
+1. Find a compatible audio file (mp3, wav, ogg, m4a, or flac) that you want to play. While not necessary, it's recommended to give it a short or easily memorable name, as users will have to repeat the filename in order to play the audio. **Make sure you're OK with the details in the filename, as these will be publicly visible to users interfacing with the bot!**
 2. In the `audio` folder of the bot, place your files there. The bot will now be able to find and play audio from the folder. You can even add and remove tracks from there while the bot is still running, although removing a track while the bot is playing it may cause critical errors.
 
 ## Development Environment 
