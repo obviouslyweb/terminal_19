@@ -55,7 +55,6 @@ I found these websites useful in developing this software:
 
 The following items I plan to fix, improve, and/or add to this project in the future:
 
-* [ ] Fix spaces in track names not working.
 * [ ] Additional playback features (show current timestamp of playing song in !queue, keep playlist mode, etc.)
 * [ ] Integrate functionality with Discord slash commands (the ability to use /play instead of !play).
 * [ ] Include integration with YouTube or Soundcloud APIs for streaming music from online sources

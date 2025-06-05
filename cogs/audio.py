@@ -74,7 +74,7 @@ class AudioCog(commands.Cog):
         self.play_next(ctx, guild_id)
 
     @commands.command()
-    async def play(self, ctx, filename: str):
+    async def play(self, ctx, *, filename: str):
         """Queue up audio from the audio folder if it's a valid audio file."""
         guild_id = ctx.guild.id
         print(f"[DEBUG] Play command received with filename: {filename!r}")
