@@ -30,7 +30,7 @@ class AudioCog(commands.Cog):
     def play_next(self, ctx, guild_id):
         queue = self.get_queue(guild_id)
 
-        async def _play():
+        async def _play(): # Main playing function
             if queue.empty():
                 return
             filename = await queue.get()
@@ -46,7 +46,7 @@ class AudioCog(commands.Cog):
             await ctx.send(f"`NOW PLAYING '{filename}'.`")
             source = discord.FFmpegPCMAudio(file_path, executable="ffmpeg")
 
-            def after_playing(error):
+            def after_playing(error): # Checks after song conclusion to determine next action
                 if error:
                     print(f"[ERROR] Playback error: {error}")
                 if self.skip_requested.get(guild_id):
@@ -69,12 +69,12 @@ class AudioCog(commands.Cog):
 
         asyncio.create_task(_play())
 
-    async def _safe_play_next(self, ctx, guild_id):
+    async def _safe_play_next(self, ctx, guild_id): # Short delay called between track start/stop
         await asyncio.sleep(1)
         self.play_next(ctx, guild_id)
 
     @commands.command()
-    async def play(self, ctx, *, filename: str):
+    async def play(self, ctx, *, filename: str): # Adds song to queue and starts playing
         """Queue up audio from the audio folder if it's a valid audio file."""
         guild_id = ctx.guild.id
         print(f"[DEBUG] Play command received with filename: {filename!r}")
