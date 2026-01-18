@@ -4,10 +4,18 @@ import logging
 from dotenv import load_dotenv
 import os
 
+print("Discord.py Version:", discord.__version__)
+print("Loaded from:", discord.__file__)
+
 load_dotenv()
 token = os.getenv('DISCORD_TOKEN')
 
-handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
+script_dir = os.path.dirname(os.path.abspath(__file__))
+log_dir = os.path.join(script_dir, "logs")
+os.makedirs(log_dir, exist_ok=True)  # create if missing
+log_path = os.path.join(log_dir, "discord.log")
+
+handler = logging.FileHandler(filename=log_path, encoding="utf-8", mode="w")
 
 intents = discord.Intents.default()
 intents.message_content = True
