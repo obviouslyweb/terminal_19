@@ -99,24 +99,33 @@ class AudioBrowserView(discord.ui.LayoutView):
     def _build(self):
         display = (lambda p: os.path.basename(p)) if self.opt_dir else (lambda p: p)
         start_index = self.page * self.page_size
+
         lines = [
             f"{start_index + i + 1}. `{display(name)}`"
             for i, name in enumerate(self.pages[self.page])
         ]
+
         title_prefix = f'Audio files in "{self.opt_dir}"' if self.opt_dir else "Audio files"
-
-        # Header, body, footer definitions
-        header = f"## {title_prefix}\n-# Page {self.page + 1}/{self.total_pages}"
-        body = "\n".join(lines) if lines else "*No audio files were found in this folder.*"
-        footer = "-# Tap a folder button to view contents | ⬆️ to go back | ⬅️ and ➡️ to switch pages"
-
-        # Audio files as components list
-        components: list = [discord.ui.TextDisplay(f"{header}\n\n{body}")]
 
         # Folder buttons
         max_folder_slots = 20
         overflow = len(self.folders) > max_folder_slots
         shown_folders = self.folders[:max_folder_slots]
+
+        # Header, body, footer definitions
+        header = f"## {title_prefix}\n-# Page {self.page + 1}/{self.total_pages}"
+
+        if lines:
+            body = "\n".join(lines)
+        elif not shown_folders:
+            body = "*No audio files were found in this folder.*"
+        else:
+            body = ""
+
+        footer = "-# Tap a folder button to view contents | ⬆️ to go back | ⬅️ and ➡️ to switch pages"
+
+        # Audio files as components list
+        components: list = [discord.ui.TextDisplay(f"{header}\n\n{body}")]
 
         for i in range(0, len(shown_folders), 5):
             row_folders = shown_folders[i:i + 5]
@@ -138,10 +147,18 @@ class AudioBrowserView(discord.ui.LayoutView):
             up_btn = discord.ui.Button(label="⬆️", style=discord.ButtonStyle.secondary)
             up_btn.callback = self._folder_callback(parent)
             nav_buttons.append(up_btn)
+
         if self.total_pages > 1:
-            prev_btn = discord.ui.Button(label="⬅️", style=discord.ButtonStyle.secondary, disabled=(self.page == 0))
-            next_btn = discord.ui.Button(label="➡️", style=discord.ButtonStyle.secondary,
-                                          disabled=(self.page >= self.total_pages - 1))
+            prev_btn = discord.ui.Button(
+                label="⬅️",
+                style=discord.ButtonStyle.secondary,
+                disabled=(self.page == 0)
+            )
+            next_btn = discord.ui.Button(
+                label="➡️",
+                style=discord.ButtonStyle.secondary,
+                disabled=(self.page >= self.total_pages - 1)
+            )
             prev_btn.callback = self._page_callback(self.page - 1)
             next_btn.callback = self._page_callback(self.page + 1)
             nav_buttons.extend([prev_btn, next_btn])
@@ -151,7 +168,10 @@ class AudioBrowserView(discord.ui.LayoutView):
 
         components.append(discord.ui.TextDisplay(footer))
 
-        container = discord.ui.Container(*components, accent_color=discord.Color(0x5865F2))
+        container = discord.ui.Container(
+            *components,
+            accent_color=discord.Color(0x5865F2)
+        )
         self.add_item(container)
 
     # ---------- Callbacks ----------
