@@ -114,8 +114,16 @@ class CommandsCog(commands.Cog):
             return
         voice_client = interaction.guild.voice_client if interaction.guild else None
         if voice_client:
+            voice_client.stop()
+            audio_cog = self.bot.get_cog("Audio")
+            if audio_cog:
+                audio_cog.cleanup_guild(
+                    interaction.guild.id
+                )
             await voice_client.disconnect()
-            await interaction.response.send_message("Disconnected from voice channel.")
+            await interaction.response.send_message(
+                "Disconnected from voice channel."
+            )
         else:
             await interaction.response.send_message("Not currently in a voice channel to leave.")
 

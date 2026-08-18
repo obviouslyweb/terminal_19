@@ -8,11 +8,12 @@ import subprocess
 import json
 from discord import app_commands
 from discord.ext import commands
+from collections import deque
 from checks import interaction_has_allowed_role
 
 
 class ChooseTrackView(discord.ui.View):
-    """Ephemeral view to pick one track when multiple files share the same name."""
+    """Ephemeral view to pick one track when multiple files share the same name"""
 
     def __init__(self, cog, paths, start_at, guild, channel, user, timeout=60):
         super().__init__(timeout=timeout)
@@ -57,6 +58,155 @@ class ChooseTrackButton(discord.ui.Button):
         view.stop()
 
 
+class FolderError(Exception):
+    """Raised for invalid/out-of-bounds folder requests in the audio browser"""
+    pass
+
+
+class AudioBrowserView(discord.ui.LayoutView):
+    """
+    Generates the folder browser for the /audio command.
+    Every interaction builds a brand new AudioBrowserView scoped to the new location
+    """
+
+    # Longer folder names are truncated when they exceed this # of characters
+    FOLDER_NAME_MAX = 20
+    # How many seconds until the bot removes the audio viewer
+    AUDIO_BROWSER_TIMEOUT = 60
+
+    def __init__(self, cog: "AudioCog", opt_dir: str | None, page: int, page_size: int, *, timeout: float = AUDIO_BROWSER_TIMEOUT):
+        super().__init__(timeout=timeout)
+        self.cog = cog
+        self.opt_dir = opt_dir
+        self.page = page
+        self.page_size = page_size
+        self.message: discord.Message | None = None
+
+        self.folders, self.files = cog.scan_audio_folder(opt_dir)
+        self.pages = [self.files[i:i + page_size] for i in range(0, len(self.files), page_size)] or [[]]
+        self.total_pages = len(self.pages)
+        # Clamps in case of a stale page index
+        self.page = max(0, min(self.page, self.total_pages - 1))
+
+        self._build()
+
+    @classmethod
+    def _truncate(cls, name: str) -> str:
+        limit = cls.FOLDER_NAME_MAX
+        return name if len(name) <= limit else name[: limit - 3] + "..."
+
+    # Layout build
+    def _build(self):
+        display = (lambda p: os.path.basename(p)) if self.opt_dir else (lambda p: p)
+        start_index = self.page * self.page_size
+        lines = [
+            f"{start_index + i + 1}. `{display(name)}`"
+            for i, name in enumerate(self.pages[self.page])
+        ]
+        title_prefix = f'Audio files in "{self.opt_dir}"' if self.opt_dir else "Audio files"
+
+        # Header, body, footer definitions
+        header = f"## {title_prefix}\n-# Page {self.page + 1}/{self.total_pages}"
+        body = "\n".join(lines) if lines else "*No audio files were found in this folder.*"
+        footer = "-# Tap a folder button to view contents | ⬆️ to go back | ⬅️ and ➡️ to switch pages"
+
+        # Audio files as components list
+        components: list = [discord.ui.TextDisplay(f"{header}\n\n{body}")]
+
+        # Folder buttons
+        max_folder_slots = 20
+        overflow = len(self.folders) > max_folder_slots
+        shown_folders = self.folders[:max_folder_slots]
+
+        for i in range(0, len(shown_folders), 5):
+            row_folders = shown_folders[i:i + 5]
+            buttons = []
+            for folder_path in row_folders:
+                name = self._truncate(f"📁 {os.path.basename(folder_path)}")
+                btn = discord.ui.Button(label=name, style=discord.ButtonStyle.primary)
+                btn.callback = self._folder_callback(folder_path)
+                buttons.append(btn)
+            components.append(discord.ui.ActionRow(*buttons))
+
+        if overflow:
+            components.append(discord.ui.TextDisplay("-# …more folders not shown"))
+
+        # Navigation row
+        nav_buttons = []
+        if self.opt_dir:
+            parent = os.path.dirname(self.opt_dir) or None
+            up_btn = discord.ui.Button(label="⬆️", style=discord.ButtonStyle.secondary)
+            up_btn.callback = self._folder_callback(parent)
+            nav_buttons.append(up_btn)
+        if self.total_pages > 1:
+            prev_btn = discord.ui.Button(label="⬅️", style=discord.ButtonStyle.secondary, disabled=(self.page == 0))
+            next_btn = discord.ui.Button(label="➡️", style=discord.ButtonStyle.secondary,
+                                          disabled=(self.page >= self.total_pages - 1))
+            prev_btn.callback = self._page_callback(self.page - 1)
+            next_btn.callback = self._page_callback(self.page + 1)
+            nav_buttons.extend([prev_btn, next_btn])
+
+        if nav_buttons:
+            components.append(discord.ui.ActionRow(*nav_buttons))
+
+        components.append(discord.ui.TextDisplay(footer))
+
+        container = discord.ui.Container(*components, accent_color=discord.Color(0x5865F2))
+        self.add_item(container)
+
+    # ---------- Callbacks ----------
+    def _folder_callback(self, target_dir: str | None):
+        async def callback(interaction: discord.Interaction):
+            if not interaction_has_allowed_role(interaction):
+                await interaction.response.send_message("You don't have permission to use this.", ephemeral=True)
+                return
+            try:
+                new_view = AudioBrowserView(self.cog, target_dir, 0, self.page_size)
+            except FolderError as e:
+                await interaction.response.send_message(str(e), ephemeral=True)
+                return
+            self.stop() # kill the original
+            await interaction.response.edit_message(view=new_view)
+            new_view.message = await interaction.original_response()
+        return callback
+
+    def _page_callback(self, target_page: int):
+        async def callback(interaction: discord.Interaction):
+            if not interaction_has_allowed_role(interaction):
+                await interaction.response.send_message("You don't have permission to use this.", ephemeral=True)
+                return
+            new_view = AudioBrowserView(self.cog, self.opt_dir, target_page, self.page_size)
+            self.stop() # kill the original
+            await interaction.response.edit_message(view=new_view)
+            new_view.message = await interaction.original_response()
+        return callback
+
+    async def on_timeout(self):
+        print("[DEBUG] Audio command timed out; triggering timeout edits.")
+
+        if self.message is None:
+            return
+        try:
+            await self.message.edit(view=AudioSmallView())
+        except discord.NotFound:
+            print("[DEBUG] ERROR: Message no longer exists.")
+        except discord.HTTPException as e:
+            print(f"[DEBUG] ERROR: Couldn't replace timed-out message: {e}")
+
+
+class AudioSmallView(discord.ui.LayoutView):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(
+            discord.ui.Container(
+                discord.ui.TextDisplay(
+                    "This audio browser has timed out. To continue using the audio browser, please use `/audio`."
+                ),
+                accent_color=discord.Color(0x5865F2)
+            )
+        )
+
+
 class AudioCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -64,7 +214,6 @@ class AudioCog(commands.Cog):
         self.looping = {}
         self.current_track = {}
         self.skip_requested = {}
-        self.queue_cache = {}
         self.audio_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "audio")
         self.next_play_start_offset = {}
         self.playback_start_time = {}
@@ -78,11 +227,12 @@ class AudioCog(commands.Cog):
 
     def get_queue(self, guild_id):
         if guild_id not in self.audio_queues:
-            self.audio_queues[guild_id] = asyncio.Queue()
+            self.audio_queues[guild_id] = deque()
             self.skip_requested[guild_id] = False
-            self.queue_cache[guild_id] = []
+
         if guild_id not in self.looping:
             self.looping[guild_id] = False
+
         return self.audio_queues[guild_id]
 
     def resolve_audio_path(self, filename):
@@ -179,9 +329,7 @@ class AudioCog(commands.Cog):
                     yield rel.replace(os.sep, '/')
 
     def find_audio_by_basename(self, basename, under_path=None):
-        """Return list of relative paths (forward slashes) under audio_folder with this basename.
-        If under_path is set (e.g. 'subfolder' or 'subfolder/nested'), only paths under that directory are returned.
-        """
+        """Return list of relative paths (forward slashes) under audio_folder with this basename"""
         valid_extensions = ('.mp3', '.wav', '.ogg', '.flac', '.m4a')
         if not basename.lower().endswith(valid_extensions):
             return []
@@ -200,8 +348,52 @@ class AudioCog(commands.Cog):
                     matches.append(rel_norm)
         return matches
 
+    # ---------- /audio helpers ----------
+    def scan_audio_folder(self, opt_dir: str | None) -> tuple[list[str], list[str]]:
+        """
+        Validates opt_dir and returns (folders, files) as display paths, sorted
+        Raises FolderError with a user-facing message on invalid input
+        """
+        search_folder = os.path.join(self.audio_folder, opt_dir) if opt_dir else self.audio_folder
+        audio_folder_real = os.path.realpath(self.audio_folder)
+        search_folder_real = os.path.realpath(search_folder)
+
+        if not os.path.isdir(search_folder):
+            raise FolderError("That folder couldn't be found. Please check your spelling and try again.")
+        if not search_folder_real.startswith(audio_folder_real):
+            raise FolderError("That folder path is not valid.")
+
+        valid_extensions = ('.mp3', '.wav', '.ogg', '.flac', '.m4a')
+        folders, files = [], []
+        with os.scandir(search_folder) as entries:
+            for entry in entries:
+                path = f"{opt_dir}/{entry.name}" if opt_dir else entry.name
+                if entry.is_dir():
+                    folders.append(path)
+                elif entry.is_file() and entry.name.lower().endswith(valid_extensions):
+                    files.append(path)
+
+        folders.sort()
+        files.sort()
+        return folders, files
+
+    def resolve_page_size(self, results: int | None) -> int:
+        if results is None:
+            try:
+                with open("./settings.json", "r") as f:
+                    settings = json.load(f)
+                return settings.get("results_default", 12)
+            except Exception as e:
+                print(f"[WARN] Failed to load settings.json during audio command. Defaulting to 12: {e}")
+                return 12
+        if results < 5:
+            return 5
+        if results < 101:
+            return results
+        return 100
+
     def _make_after_callback(self, channel, guild_id, voice_client):
-        """Return the after_playing callback used when a track ends (loop, skip, or next)."""
+        """Return the after_playing callback used when a track ends (loop, skip, or next)"""
         def after_playing(error):
             if self.skipto_in_progress.pop(guild_id, False):
                 return
@@ -236,12 +428,11 @@ class AudioCog(commands.Cog):
         voice_client = guild.voice_client if guild else None
 
         async def _play():
-            if queue.empty():
+            if not queue:
                 self.current_track.pop(guild_id, None)
                 self.clear_timestamp_state(guild_id)
                 return
-            filename = await queue.get()
-            self.queue_cache[guild_id].pop(0)
+            filename = queue.popleft()
             file_path = self.resolve_audio_path(filename)
             if not os.path.exists(file_path):
                 await channel.send(f"Couldn't find `{filename}`; please check your spelling and try again.")
@@ -285,9 +476,8 @@ class AudioCog(commands.Cog):
             just_connected = True
         guild_id = guild.id
         queue = self.get_queue(guild_id)
-        queue_was_empty = queue.empty() and not voice_client.is_playing()
-        await queue.put(path)
-        self.queue_cache[guild_id].append(path)
+        queue_was_empty = (not queue) and not voice_client.is_playing()
+        queue.append(path)
         if start_at is not None and queue_was_empty:
             parsed = self.parse_timestamp(start_at)
             if parsed is not None and parsed >= 0:
@@ -299,6 +489,16 @@ class AudioCog(commands.Cog):
         else:
             msg = f"Queued the following track: `{path}`."
         return True, msg
+
+    def cleanup_guild(self, guild_id: int):
+        self.audio_queues.pop(guild_id, None)
+        self.looping.pop(guild_id, None)
+        self.current_track.pop(guild_id, None)
+        self.skip_requested.pop(guild_id, None)
+
+        self.clear_timestamp_state(guild_id)
+
+        print(f"[DEBUG] Cleaned audio state for guild {guild_id}")
 
     @app_commands.command(name="play", description="Queue audio from the audio folder. Use /audio to list files.")
     @app_commands.describe(
@@ -380,10 +580,9 @@ class AudioCog(commands.Cog):
             just_connected = True
 
         queue = self.get_queue(guild_id)
-        queue_was_empty = queue.empty() and not voice_client.is_playing()
+        queue_was_empty = (not queue) and not voice_client.is_playing()
         for entry in to_queue:
-            await queue.put(entry)
-            self.queue_cache[guild_id].append(entry)
+            queue.append(entry)
 
         if start_at is not None and len(to_queue) == 1 and queue_was_empty:
             self.next_play_start_offset[guild_id] = self.parse_timestamp(start_at)
@@ -421,7 +620,7 @@ class AudioCog(commands.Cog):
             voice_client.stop()
             await asyncio.sleep(1)
             queue = self.get_queue(guild_id)
-            if queue.empty():
+            if not queue:
                 await interaction.response.send_message("The end of the queue has been reached. Use /play (file) to continue audio playback.")
             else:
                 await interaction.response.send_message("Skipped to the next track.")
@@ -468,7 +667,7 @@ class AudioCog(commands.Cog):
             return
 
         file_path = self.current_track[guild_id]
-        self.skipto_in_progress[guild_id] = True  # so after() from stop() doesn't advance queue
+        self.skipto_in_progress[guild_id] = True
         voice_client.stop()
         self.start_offset_seconds[guild_id] = parsed
         self.playback_start_time[guild_id] = time.monotonic()
@@ -495,16 +694,14 @@ class AudioCog(commands.Cog):
         if voice_client:
             voice_client.stop()
             queue = self.get_queue(guild_id)
-            self.queue_cache[guild_id].clear()
             self.looping[guild_id] = False
             self.clear_timestamp_state(guild_id)
             self.current_track.pop(guild_id, None)
-            while not queue.empty():
-                queue.get_nowait()
+            queue.clear()
             await interaction.response.send_message("Audio has been stopped and the queue has been erased.")
         else:
             await interaction.response.send_message("Not currently in a voice channel.")
-    
+
     @app_commands.command(name="clearqueue", description="Clear the rest of the song queue.")
     async def clearqueue(self, interaction: discord.Interaction):
         if not interaction_has_allowed_role(interaction):
@@ -517,10 +714,8 @@ class AudioCog(commands.Cog):
         voice_client = interaction.guild.voice_client
         if voice_client:
             queue = self.get_queue(guild_id)
-            self.queue_cache[guild_id].clear()
-            if not queue.empty():
-                while not queue.empty():
-                    queue.get_nowait()
+            if not not queue:
+                queue.clear()
                 await interaction.response.send_message("The queue has been cleared.")
             else:
                 await interaction.response.send_message("The queue is already empty.")
@@ -586,7 +781,7 @@ class AudioCog(commands.Cog):
             return
         guild_id = interaction.guild.id
         current = self.current_track.get(guild_id)
-        queue = self.queue_cache.get(guild_id, [])
+        queue = self.audio_queues.get(guild_id, [])
 
         if not current and not queue:
             embed = discord.Embed(
@@ -604,7 +799,7 @@ class AudioCog(commands.Cog):
             total_sec = self.total_duration_seconds.get(guild_id)
             elapsed_sec = self.get_current_elapsed(guild_id)
             if total_sec is not None and elapsed_sec is not None:
-                # Clamp elapsed to total for display (e.g. past end while switching)
+                # clamp elapsed to total for display
                 display_elapsed = min(int(elapsed_sec), int(total_sec))
                 now_playing_value = f"`{current_filename}` — {self.format_timestamp(display_elapsed)}/{self.format_timestamp(total_sec)}"
             else:
@@ -612,8 +807,8 @@ class AudioCog(commands.Cog):
             embed.add_field(name="Now playing", value=now_playing_value, inline=False)
 
         if queue:
-            # Discord field value limit is 1024; show up to ~20 tracks or truncate
-            lines = [f"{i}. `{track}`" for i, track in enumerate(queue[:20], start=1)]
+            # show up to 20 tracks or truncate
+            lines = [f"{i}. `{track}`" for i, track in enumerate(list(queue)[:20], start=1)]
             queue_text = "\n".join(lines)
             if len(queue) > 20:
                 queue_text += f"\n*...and {len(queue) - 20} more*"
@@ -631,107 +826,17 @@ class AudioCog(commands.Cog):
         if not interaction_has_allowed_role(interaction):
             await interaction.response.send_message("You don't have permission to use this command.", ephemeral=True)
             return
+
         try:
-            opt_dir = subfolder
-            search_folder = os.path.join(self.audio_folder, opt_dir) if opt_dir else self.audio_folder
-            audio_folder_real = os.path.realpath(self.audio_folder)
-            search_folder_real = os.path.realpath(search_folder)
-
-            if not os.path.isdir(search_folder):
-                await interaction.response.send_message("That folder couldn't be found. Please check your spelling and try again.", ephemeral=True)
-                return
-            if not search_folder_real.startswith(audio_folder_real):
-                await interaction.response.send_message("That folder path is not valid.", ephemeral=True)
+            try:
+                page_size = self.resolve_page_size(results)
+                view = AudioBrowserView(self, subfolder, 0, page_size)
+            except FolderError as e:
+                await interaction.response.send_message(str(e), ephemeral=True)
                 return
 
-            valid_extensions = ('.mp3', '.wav', '.ogg', '.flac', '.m4a')
-            folders = []
-            files = []
-            with os.scandir(search_folder) as entries:
-                for entry in entries:
-                    path = f"{opt_dir}/{entry.name}" if opt_dir else entry.name
-                    if entry.is_dir():
-                        folders.append(path)
-                    elif entry.is_file() and entry.name.lower().endswith(valid_extensions):
-                        files.append(path)
-
-            folders.sort()
-            files.sort()
-            # When inside a subfolder, show only names (no path prefix) for cleaner display
-            display = (lambda p: os.path.basename(p)) if opt_dir else (lambda p: p)
-            folder_line = ("📁 " + ", ".join(f"**{display(path)}**" for path in folders)) if folders else ""
-            file_entries = [f"`{display(path)}`" for path in files]
-            all_entries = ([folder_line] if folder_line else []) + file_entries
-
-            if not all_entries:
-                await interaction.response.send_message("No audio files or subfolders were found in this folder.")
-                return
-
-            # If no provided results, load default results per page
-            if results is None:
-                try:
-                    with open("./settings.json", "r") as f:
-                        settings = json.load(f)
-                    page_size = settings.get("results_default", 12)
-                except Exception as e:
-                    print(f"[WARN] Failed to load settings.json during audio command. Defaulting to 12: {e}")
-                    page_size = 12
-            else:
-                # User provided specific number, round if needed and set
-                if results >= 5 and results < 101:
-                    page_size = results
-                elif results < 5:
-                    page_size = 5
-                else:
-                    page_size = 100
-
-            pages = [all_entries[i:i+page_size] for i in range(0, len(all_entries), page_size)]
-            total_pages = len(pages)
-            current_page = 0
-            title_prefix = f'Available audio in "{opt_dir}"' if opt_dir else "Available audio"
-
-            def get_page_embed(page):
-                lines = [f"{1 + page * page_size + i}. {name}" for i, name in enumerate(pages[page])]
-                embed = discord.Embed(
-                    title=f"{title_prefix} (page {page+1}/{total_pages})",
-                    description="\n".join(lines),
-                    color=0x5865F2,
-                )
-                footer = "Use /audio (folder) to view a folder, /play (filename) to play"
-                if total_pages > 1:
-                    footer += " • Arrow reactions to change pages"
-                embed.set_footer(text=footer)
-                return embed
-
-            await interaction.response.send_message(embed=get_page_embed(current_page))
-            message = await interaction.original_response()
-
-            if total_pages == 1:
-                return
-
-            await message.add_reaction("⬅️")
-            await message.add_reaction("➡️")
-
-            def check(reaction, user):
-                return (
-                    user == interaction.user and reaction.message.id == message.id and str(reaction.emoji) in ["⬅️", "➡️"]
-                )
-
-            while True:
-                try:
-                    reaction, user = await self.bot.wait_for('reaction_add', timeout=60.0, check=check)
-                    if str(reaction.emoji) == "➡️":
-                        if current_page < total_pages - 1:
-                            current_page += 1
-                            await message.edit(embed=get_page_embed(current_page))
-                    elif str(reaction.emoji) == "⬅️":
-                        if current_page > 0:
-                            current_page -= 1
-                            await message.edit(embed=get_page_embed(current_page))
-                    await message.remove_reaction(reaction, user)
-                except asyncio.TimeoutError:
-                    await message.clear_reactions()
-                    break
+            await interaction.response.send_message(view=view)
+            view.message = await interaction.original_response()
 
         except Exception as e:
             print(f"[ERROR] Error reading audio folder in audio command: {e}")
@@ -739,6 +844,16 @@ class AudioCog(commands.Cog):
                 await interaction.response.send_message("There was an error attempting to read the audio folder.", ephemeral=True)
             except Exception:
                 await interaction.followup.send("There was an error attempting to read the audio folder.", ephemeral=True)
-                
+
+    # Handle unexpected disconnect
+    @commands.Cog.listener()
+    async def on_voice_state_update(self, member, before, after):
+        if member.id != self.bot.user.id:
+            return
+        guild = member.guild
+        if before.channel and after.channel is None:
+            self.cleanup_guild(guild.id)
+
+
 async def setup(bot):
     await bot.add_cog(AudioCog(bot))
