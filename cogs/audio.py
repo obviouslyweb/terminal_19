@@ -814,46 +814,46 @@ class AudioCog(commands.Cog):
             self.looping[guild_id] = True
             await interaction.response.send_message("Looping is now enabled.")
 
-    @app_commands.command(name="pause", description="Pause the currently playing track.")
-    async def pause(self, interaction: discord.Interaction):
-        if not interaction_has_allowed_role(interaction):
-            await interaction.response.send_message("You don't have permission to use this command.", ephemeral=True)
-            return
-        if not interaction.guild:
-            await interaction.response.send_message("No audio is currently playing that can be paused.", ephemeral=True)
-            return
-        guild_id = interaction.guild.id
-        voice_client = interaction.guild.voice_client
-        if voice_client and voice_client.is_playing():
-            voice_client.pause()
-            self.pause_start_time[guild_id] = time.monotonic()
-            await interaction.response.send_message("Audio is now paused.")
-        else:
-            await interaction.response.send_message("No audio is currently playing that can be paused.")
 
-    @app_commands.command(name="unpause", description="Resume the paused track.")
-    async def unpause(self, interaction: discord.Interaction):
+    @app_commands.command(name="pause", description="Pause the currently playing track (or unpause it, if already paused).")
+    async def pause(self, interaction: discord.Interaction):
+        
         if not interaction_has_allowed_role(interaction):
             await interaction.response.send_message("You don't have permission to use this command.", ephemeral=True)
             return
         if not interaction.guild:
-            await interaction.response.send_message("Audio is not currently paused.", ephemeral=True)
+            await interaction.response.send_message("No audio is currently playing.", ephemeral=True)
             return
+
         guild_id = interaction.guild.id
         voice_client = interaction.guild.voice_client
-        if voice_client and voice_client.is_paused():
+        if not voice_client:
+            await interaction.response.send_message("No audio is currently playing.")
+            return
+
+        if voice_client.is_paused():
             voice_client.resume()
-            if guild_id in self.pause_start_time and self.pause_start_time[guild_id] is not None:
-                self.accumulated_pause_seconds[guild_id] = self.accumulated_pause_seconds.get(guild_id, 0) + (time.monotonic() - self.pause_start_time[guild_id])
+            pause_started = self.pause_start_time.get(guild_id)
+            if pause_started is not None:
+                self.accumulated_pause_seconds[guild_id] = self.accumulated_pause_seconds.get(guild_id, 0) + (time.monotonic() - pause_started)
                 self.pause_start_time[guild_id] = None
             await interaction.response.send_message("Continuing playback.")
-        else:
-            await interaction.response.send_message("Audio is not currently paused.")
+            return
+
+        if voice_client.is_playing():
+            self.accumulated_pause_seconds.setdefault(guild_id, 0)
+            voice_client.pause()
+            self.pause_start_time[guild_id] = time.monotonic()
+            await interaction.response.send_message("Pausing playback.")
+            return
+
+        await interaction.response.send_message("No audio is currently playing.")
+        
 
     @app_commands.command(name="queue", description="View the current queue and now playing.")
     async def queue(self, interaction: discord.Interaction):
         if not interaction.guild:
-            await interaction.response.send_message("The queue is currently empty.", ephemeral=True)
+            await interaction.response.send_message("The queue is empty.", ephemeral=True)
             return
         guild_id = interaction.guild.id
         current = self.current_track.get(guild_id)
