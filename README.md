@@ -9,7 +9,7 @@ Woolwav is an audio streaming bot created using Discord.py and ffmpeg that allow
 - Add and remove audio files without the need to restart the bot.
 - Queue audio files in order and loop tracks if desired. 
 - Pausing mid-playback, stopping, and skipping songs.
-- View the current track queue and timestamp, and skip to different timestamps within the playing audio track with `/skipto`.
+- View the current track queue and timestamp, and skip to different timestamps within the playing audio track with `/jump`.
 - See a list of available files to play with `/audio`.
 - Optionally restrict commands to users with specified Discord roles through `.env`.
 - Logs important events to a file in the `logs` directory for debugging and monitoring.

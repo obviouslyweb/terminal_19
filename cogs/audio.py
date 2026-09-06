@@ -11,7 +11,7 @@ from discord.ext import commands
 from collections import deque
 from checks import interaction_has_allowed_role
 
-
+# ----------- Classes for interactions -----------
 class ChooseTrackView(discord.ui.View):
     """Ephemeral view to pick one track when multiple files share the same name"""
 
@@ -202,8 +202,6 @@ class AudioBrowserView(discord.ui.LayoutView):
         return callback
 
     async def on_timeout(self):
-        print("[DEBUG] Audio command timed out; triggering timeout edits.")
-
         if self.message is None:
             return
         try:
@@ -226,7 +224,7 @@ class AudioSmallView(discord.ui.LayoutView):
             )
         )
 
-
+# ----------- Cog for audio commands -----------
 class AudioCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -621,7 +619,7 @@ class AudioCog(commands.Cog):
         if not voice_client.is_playing():
             self.play_next(interaction.channel, guild_id)
 
-
+    
     @app_commands.command(name="skip", description="Skip the currently playing track.")
     async def skip(self, interaction: discord.Interaction):
         if not interaction_has_allowed_role(interaction):
@@ -701,6 +699,7 @@ class AudioCog(commands.Cog):
 
         await interaction.response.send_message(f"Skipped to **{self.format_timestamp(parsed)}**.")
 
+
     @app_commands.command(name="stop", description="Stop playing and clear the queue.")
     async def stop(self, interaction: discord.Interaction):
         if not interaction_has_allowed_role(interaction):
@@ -722,6 +721,7 @@ class AudioCog(commands.Cog):
         else:
             await interaction.response.send_message("Not currently in a voice channel.")
 
+
     @app_commands.command(name="clearqueue", description="Clear the rest of the song queue.")
     async def clearqueue(self, interaction: discord.Interaction):
         if not interaction_has_allowed_role(interaction):
@@ -741,6 +741,62 @@ class AudioCog(commands.Cog):
                 await interaction.response.send_message("The queue is already empty.")
         else:
             await interaction.response.send_message("Not currently in a voice channel to clear the queue.")
+
+
+    @app_commands.command(name="jump", description="Jump to a different part in the currently playing track.")
+    @app_commands.describe(
+        timestamp="Time to jump to (e.g. 1:15, 1:15:30, or 75 for seconds).",
+    )
+    async def jump(self, interaction: discord.Interaction, timestamp: str):
+        if not interaction_has_allowed_role(interaction):
+            await interaction.response.send_message("You don't have permission to use this command.", ephemeral=True)
+            return
+        if not interaction.guild:
+            await interaction.response.send_message("This command only works in servers.", ephemeral=True)
+            return
+        guild_id = interaction.guild.id
+        voice_client = interaction.guild.voice_client
+        if not voice_client:
+            await interaction.response.send_message("Not currently in a voice channel.", ephemeral=True)
+            return
+        if not (voice_client.is_playing() or voice_client.is_paused()):
+            await interaction.response.send_message("No audio is currently playing to jump within.", ephemeral=True)
+            return
+        if guild_id not in self.current_track:
+            await interaction.response.send_message("No track is currently focused.", ephemeral=True)
+            return
+
+        parsed = self.parse_timestamp(timestamp)
+        if parsed is None or parsed < 0:
+            await interaction.response.send_message(
+                "Invalid timestamp. Use e.g. `1:15`, `1:15:30`, or `75` (seconds).",
+                ephemeral=True,
+            )
+            return
+
+        total_duration = self.total_duration_seconds.get(guild_id)
+        if total_duration is not None and parsed >= total_duration:
+            await interaction.response.send_message(
+                "This timestamp exceeds the total runtime of the focused audio track! Please try again, this time in the bounds of the track length.",
+                ephemeral=True,
+            )
+            return
+
+        file_path = self.current_track[guild_id]
+        self.skipto_in_progress[guild_id] = True
+        voice_client.stop()
+        self.start_offset_seconds[guild_id] = parsed
+        self.playback_start_time[guild_id] = time.monotonic()
+        self.accumulated_pause_seconds[guild_id] = 0
+        self.pause_start_time[guild_id] = None
+
+        before_options = f"-ss {int(parsed)}"
+        source = discord.FFmpegPCMAudio(file_path, executable="ffmpeg", before_options=before_options)
+        after_playing = self._make_after_callback(interaction.channel, guild_id, voice_client)
+        voice_client.play(source, after=after_playing)
+
+        await interaction.response.send_message(f"Jumped to **{self.format_timestamp(parsed)}**.")
+
 
     @app_commands.command(name="loop", description="Toggle looping for the current track.")
     async def loop(self, interaction: discord.Interaction):
