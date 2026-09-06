@@ -9,7 +9,7 @@ import os
 import time
 
 # Bot version number
-VERSION = "2.8.0"
+VERSION = "2.8.1"
 
 # Print Discord.py version and file load location for debug
 print("Discord.py Version:", discord.__version__)
