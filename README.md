@@ -23,7 +23,7 @@ Woolwav is an audio streaming bot created using Discord.py and ffmpeg that allow
 ### Setup instructions
 1. Download [ffmpeg](https://ffmpeg.org/download.html) and add it to your PATH. You can download pre-compiled versions from other users or compile it yourself (although doing so is a complicated process).
 2. Download and install [Python](https://www.python.org/downloads/), as well as add it to PATH. Versions 3.9 to 3.12 are confirmed to work well, but 3.13 and above may have slight compatibility issues with Discord.py, so you may encounter issues with that route.
-3. Download the contents of this repository (`woolwav`) to your computer and store in a safe location (optimally somewhere quick and easy to access).
+3. Download the latest release of (`woolwav`) to your computer and store in a safe location (optimally somewhere quick and easy to access).
 4. Log into the [Discord Developer Portal](https://discord.com/developers/applications) using your Discord account. Create a new application and give it a name as well as an icon if you'd like. On the *Bot* page, toggle "Server Members Intent" and "Message Content Intent"; these are required for the bot to be able to properly process user information and messages to read messages.
 > [!NOTE]
 > If you choose to use the Woolwav name, logo, or icon for your bot, your bot's description on the Discord Developer Portal **must** state that it is not owned or maintained by TheWebCon / obviouslyweb. I recommend giving it a custom name and icon of your choosing, but it's entirely up to you. See the **Legal Disclaimers** section below for more details.
